@@ -23,5 +23,13 @@ services:
         resource: '../src/Controller'
         tags: ['controller.service_arguments']
 
-    # add more service definitions when explicit configuration is needed
-    # please note that last definitions always *replace* previous ones
+    # Uses constructor to deserialize objects and properties to serialize them.
+    Symfony\Component\Serializer\Normalizer\PropertyNormalizer:
+        public: false
+        tags: [serializer.normalizer]
+
+    App\Infrastructure\GitHub\Client:
+        class: App\Infrastructure\GitHub\HttpClient
+        arguments:
+            $appId: "%env(GITHUB_APP_ID)%"
+            $privateKey: "%env(GITHUB_APP_KEY)%"
