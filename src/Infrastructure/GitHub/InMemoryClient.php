@@ -51,10 +51,11 @@ final class InMemoryClient implements Client
     }
 
     /**
-     * @return Deployment[]
+     * {@inheritDoc}
      */
-    public function getDeployments(): array
+    public function listDeployments(Tenant $tenant, string $service): array
     {
+        $this->checkTenant($tenant);
         return $this->deployments;
     }
 

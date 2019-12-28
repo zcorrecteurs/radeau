@@ -2,8 +2,7 @@
 
 namespace App\Controller;
 
-use App\Domain\Deployment;
-use App\Domain\Environment;
+use App\Domain\JsonSerializer;
 use App\Infrastructure\GitHub\Client;
 use App\Infrastructure\GitHub\ServiceNotFoundException;
 use App\Infrastructure\GitHub\TenantNotFoundException;
@@ -32,49 +31,69 @@ final class DeploymentController
      * @param Request $request
      * @return Response
      */
-    public function create(Request $request): Response
+    public function createDeployment(Request $request): Response
     {
         try {
             $tenant = $this->github->getTenant('zcorrecteurs');
         } catch (TenantNotFoundException $e) {
             return $this->createInvalidArgumentResponse($e->getMessage());
         }
-
-        $json = json_decode($request->getContent(), true);
-        if (null === $json) {
-            return $this->createInvalidArgumentResponse('Invalid JSON content: ' . json_last_error_msg());
-        }
-
-        $missingKeys = array_diff(['environment', 'service', 'ref'], array_keys($json));
-        if ($missingKeys) {
-            return $this->createInvalidArgumentResponse('Missing keys: ' . implode(', ', $missingKeys));
-        }
-
         try {
-            $environment = Environment::fromName($json['environment']);
+            $deployment = JsonSerializer::decodeDeployment($request->getContent());
         } catch (\InvalidArgumentException $e) {
             return $this->createInvalidArgumentResponse($e->getMessage());
         }
 
-        $deployment = new Deployment($json['service'], $json['ref'], $environment);
         try {
             $this->github->createDeployment($tenant, $deployment);
         } catch (ServiceNotFoundException $e) {
             return $this->createInvalidArgumentResponse($e->getMessage());
         }
 
-        return new JsonResponse([
-            'ref' => $deployment->getRef(),
-            'service' => $deployment->getService(),
-            'environment' => $deployment->getEnvironment()->getName(),
-        ]);
+        return $this->createJsonResponse(JsonSerializer::encodeDeployment($deployment));
     }
 
-    private function createInvalidArgumentResponse(string $message)
+    /**
+     * @Route("/api/deployment/{service}", methods={"GET"})
+     *
+     * @param Request $request
+     * @param string $service
+     * @return Response
+     */
+    public function listDeployments(Request $request, string $service): Response
+    {
+        try {
+            $tenant = $this->github->getTenant('zcorrecteurs');
+        } catch (TenantNotFoundException $e) {
+            return $this->createInvalidArgumentResponse($e->getMessage());
+        }
+        try {
+            $deployments = $this->github->listDeployments($tenant, $service);
+        } catch (ServiceNotFoundException $e) {
+            return $this->createNotFoundResponse($e->getMessage());
+        }
+
+        return $this->createJsonResponse( JsonSerializer::encodeDeployments($deployments));
+    }
+
+    private function createInvalidArgumentResponse(string $message): Response
     {
         return new JsonResponse([
             'code' => 'INVALID_ARGUMENT',
             'message' => $message,
         ], 400);
+    }
+
+    private function createNotFoundResponse(string $message): Response
+    {
+        return new JsonResponse([
+            'code' => 'NOT_FOUND',
+            'message' => $message,
+        ], 404);
+    }
+
+    private function createJsonResponse(string $json): Response
+    {
+        return new JsonResponse($json, 200, [], true);
     }
 }

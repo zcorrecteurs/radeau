@@ -27,6 +27,6 @@ class DeploymentControllerTest extends TestCase
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertJsonStringEqualsJsonString('{"ref":"master","service":"foo","environment":"production"}', $response->getContent());
 
-        $this->assertEquals(1, count($this->client->getDeployments()));
+        $this->assertEquals(1, count($this->client->listDeployments()));
     }
 }

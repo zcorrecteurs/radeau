@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain;
 
 final class Environment
@@ -15,7 +17,7 @@ final class Environment
      * @param bool $production
      * @param bool $transient
      */
-    private function __construct(string $name, bool $production, bool $transient)
+    public function __construct(string $name, bool $production, bool $transient)
     {
         $this->name = $name;
         $this->production = $production;

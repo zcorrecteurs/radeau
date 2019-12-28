@@ -3,6 +3,7 @@
 namespace App\Infrastructure\GitHub;
 
 use App\Domain\Deployment;
+use App\Domain\Environment;
 use App\Domain\Tenant;
 use Firebase\JWT\JWT;
 use Symfony\Component\HttpClient\HttpClient;
@@ -98,6 +99,34 @@ final class RestClient implements Client
             throw new ServiceNotFoundException($tenant, $deployment->getService());
         }
         $this->checkStatusCode($response);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function listDeployments(Tenant $tenant, string $service): array
+    {
+        $url = sprintf('%s/repos/%s/%s/deployments', self::API_URL, $tenant->getAccount(), $service);
+        $response = $this->httpClient->request('GET', $url, [
+            'headers' => [
+                'Authorization' => $this->getInstallAuthorizationHeader($tenant),
+                'Accept' => self::ANT_MAN_MEDIA_TYPE,
+            ],
+        ]);
+        if ($this->getStatusCode($response) === 404) {
+            throw new ServiceNotFoundException($tenant, $service);
+        }
+        $this->checkStatusCode($response);
+        $data = $this->decodeJson($response);
+
+        $deployments = [];
+        foreach ($data as $obj) {
+            $environment = new Environment($obj['environment'], (bool)$obj['production_environment'], (bool)$obj['transient_environment']);
+            $createdAt = \DateTimeImmutable::createFromFormat('Y-m-d\TH:i:s+', $obj['created_at']);
+            $deployments[] = new Deployment($service, $obj['ref'], $environment, [], $createdAt);
+        }
+
+        return $deployments;
     }
 
     /**

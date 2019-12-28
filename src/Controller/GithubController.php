@@ -31,8 +31,6 @@ final class GithubController
     {
         $type = $request->headers->get('X-GitHub-Event');
         $json = json_decode($request->getContent(), true);
-        var_dump('type', $type);
-        var_dump('json', $json);
         switch ($type) {
             case 'deployment_event':
                 $deployment = $json['deployment'];
