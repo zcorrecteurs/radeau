@@ -22,9 +22,6 @@ final class Deployment
         $this->environment = $environment;
     }
 
-    /**
-     * @return string
-     */
     public function getService(): string
     {
         return $this->service;

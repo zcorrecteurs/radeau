@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Domain\Deployment;
 use App\Domain\Environment;
 use App\Infrastructure\GitHub\Client;
+use App\Infrastructure\GitHub\TenantNotFoundException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -33,6 +34,12 @@ final class DeploymentController
      */
     public function create(Request $request): Response
     {
+        try {
+            $tenant = $this->github->getTenant('zcorrecteurs');
+        } catch (TenantNotFoundException $e) {
+            throw new BadRequestHttpException('Unknown account: zcorrecteurs');
+        }
+
         $json = json_decode($request->getContent(), true);
         if (null === $json) {
             throw new BadRequestHttpException('Invalid JSON content');
@@ -49,7 +56,7 @@ final class DeploymentController
         }
 
         $deployment = new Deployment($json['service'], $json['ref'], $environment);
-        $this->github->createDeployment($deployment);
+        $this->github->createDeployment($tenant, $deployment);
 
         return new JsonResponse([
             'ref' => $deployment->getRef(),

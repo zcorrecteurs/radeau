@@ -25,8 +25,8 @@ final class Environment
     public static function fromName(string $name): Environment
     {
         switch ($name) {
-            case 'production':
             case 'prod':
+            case 'production':
                 return new Environment('production', true, false);
             case 'staging':
                 return new Environment('staging', false, false);

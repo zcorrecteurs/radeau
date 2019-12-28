@@ -14,7 +14,7 @@ class DeploymentControllerTest extends TestCase
 
     public function setUp()
     {
-        $this->client = new InMemoryClient();
+        $this->client = new InMemoryClient('zcorrecteurs');
         $this->controller = new DeploymentController($this->client);
     }
 

@@ -29,7 +29,10 @@ services:
         tags: [serializer.normalizer]
 
     App\Infrastructure\GitHub\Client:
-        class: App\Infrastructure\GitHub\HttpClient
+        class: App\Infrastructure\GitHub\RestClient
         arguments:
             $appId: "%env(GITHUB_APP_ID)%"
-            $privateKey: "%env(GITHUB_APP_KEY)%"
+            $privateKey: "%env(GITHUB_PRIVATE_KEY)%"
+
+    App\Infrastructure\Kubernetes\Client:
+        class: App\Infrastructure\Kubernetes\KubeClient
