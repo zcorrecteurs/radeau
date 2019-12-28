@@ -4,8 +4,7 @@ namespace App\Controller;
 
 use App\Domain\JsonSerializer;
 use App\Infrastructure\GitHub\Client;
-use App\Infrastructure\GitHub\ServiceNotFoundException;
-use App\Infrastructure\GitHub\TenantNotFoundException;
+use App\Infrastructure\GitHub\RepositoryNotFoundException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -26,16 +25,17 @@ final class DeploymentController
     }
 
     /**
-     * @Route("/api/deployment", methods={"POST"})
+     * @Route("/api/deployment/{service}", methods={"POST"})
      *
      * @param Request $request
+     * @param string $service
      * @return Response
      */
-    public function createDeployment(Request $request): Response
+    public function createDeployment(Request $request, string $service): Response
     {
         try {
-            $tenant = $this->github->getTenant('zcorrecteurs');
-        } catch (TenantNotFoundException $e) {
+            $tenant = $this->github->getRepository('zcorrecteurs', $service);
+        } catch (RepositoryNotFoundException $e) {
             return $this->createInvalidArgumentResponse($e->getMessage());
         }
         try {
@@ -46,7 +46,7 @@ final class DeploymentController
 
         try {
             $this->github->createDeployment($tenant, $deployment);
-        } catch (ServiceNotFoundException $e) {
+        } catch (RepositoryNotFoundException $e) {
             return $this->createInvalidArgumentResponse($e->getMessage());
         }
 
@@ -63,13 +63,13 @@ final class DeploymentController
     public function listDeployments(Request $request, string $service): Response
     {
         try {
-            $tenant = $this->github->getTenant('zcorrecteurs');
-        } catch (TenantNotFoundException $e) {
+            $repository = $this->github->getRepository('zcorrecteurs', $service);
+        } catch (RepositoryNotFoundException $e) {
             return $this->createInvalidArgumentResponse($e->getMessage());
         }
         try {
-            $deployments = $this->github->listDeployments($tenant, $service);
-        } catch (ServiceNotFoundException $e) {
+            $deployments = $this->github->listDeployments($repository);
+        } catch (RepositoryNotFoundException $e) {
             return $this->createNotFoundResponse($e->getMessage());
         }
 

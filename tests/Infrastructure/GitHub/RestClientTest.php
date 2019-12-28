@@ -2,7 +2,7 @@
 
 namespace App\Tests\Infrastructure\GitHub;
 
-use App\Domain\Tenant;
+use App\Domain\Repository;
 use App\Infrastructure\GitHub\RestClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
@@ -14,7 +14,7 @@ class RestClientTest extends TestCase
 {
     private static $cache;
     private $client;
-    private $tenant;
+    private $repository;
 
     public static function setUpBeforeClass()
     {
@@ -26,27 +26,35 @@ class RestClientTest extends TestCase
     protected function setUp()
     {
         $this->client = new RestClient(self::$cache, getenv('GITHUB_APP_ID'), getenv('GITHUB_PRIVATE_KEY'));
-        $this->tenant = new Tenant('zcorrecteurs', (int) getenv('GITHUB_INSTALL_ID'));
+        $this->repository = new Repository('zcorrecteurs', 'radeau', (int)getenv('GITHUB_INSTALL_ID'));
     }
 
-    public function testGetTenant()
+    public function testGetRepository()
     {
-        $tenant = $this->client->getTenant($this->tenant->getAccount());
+        $repository = $this->client->getRepository($this->repository->getOwner(), $this->repository->getName());
 
-        $this->assertEquals($this->tenant, $tenant);
+        $this->assertEquals($this->repository, $repository);
     }
 
     /**
-     * @expectedException \App\Infrastructure\GitHub\TenantNotFoundException
+     * @expectedException \App\Infrastructure\GitHub\RepositoryNotFoundException
      */
-    public function testGetTenantWhenAccountDoesNotExist()
+    public function testGetRepositoryWhenOwnerDoesNotExist()
     {
-        $this->client->getTenant('foo');
+        $this->client->getRepository('foo', $this->repository->getName());
+    }
+
+    /**
+     * @expectedException \App\Infrastructure\GitHub\RepositoryNotFoundException
+     */
+    public function testGetRepositoryWhenRepositoryDoesNotExist()
+    {
+        $this->client->getRepository($this->repository->getOwner(), 'foo');
     }
 
     public function testReadFile()
     {
-        $contents = $this->client->readFile($this->tenant, 'radeau', 'bin/console');
+        $contents = $this->client->readFile($this->repository, 'bin/console');
 
         $this->assertStringStartsWith('#!', $contents);
     }
@@ -56,7 +64,7 @@ class RestClientTest extends TestCase
      */
     public function testReadFileWhenFileIsADirectory()
     {
-        $this->client->readFile($this->tenant, 'radeau', 'bin');
+        $this->client->readFile($this->repository, 'bin');
     }
 
     /**
@@ -64,14 +72,6 @@ class RestClientTest extends TestCase
      */
     public function testReadFileWhenFileDoesNotExist()
     {
-        $this->client->readFile($this->tenant, 'radeau', 'bin/foo');
-    }
-
-    /**
-     * @expectedException \App\Infrastructure\GitHub\FileNotFoundException
-     */
-    public function testReadFileWithServiceDoesNotExist()
-    {
-        $this->client->readFile($this->tenant, 'foo', 'bin/console');
+        $this->client->readFile($this->repository, 'bin/foo');
     }
 }

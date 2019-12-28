@@ -4,7 +4,7 @@ namespace App\Infrastructure\GitHub;
 
 use App\Domain\Deployment;
 use App\Domain\Environment;
-use App\Domain\Tenant;
+use App\Domain\Repository;
 use Firebase\JWT\JWT;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -55,33 +55,29 @@ final class RestClient implements Client
     /**
      * {@inheritDoc}
      */
-    public function getTenant(string $account): Tenant
+    public function getRepository(string $owner, string $name): Repository
     {
-        $response = $this->httpClient->request('GET', self::API_URL . '/app/installations', [
+        $url = sprintf('%s/repos/%s/%s/installation', self::API_URL, $owner, $name);
+        $response = $this->httpClient->request('GET', $url, [
             'headers' => [
                 'Authorization' => $this->getAppAuthorizationHeader(),
                 'Accept' => self::MACHINE_MAN_MEDIA_TYPE,
             ],
         ]);
-        $this->checkStatusCode($response);
-
-        // Note: pagination is not handled here, as we do not expect more than one installation.
-        $json = $this->decodeJson($response);
-        foreach ($json as $installation) {
-            if ($installation['account']['login'] === $account) {
-                return new Tenant($installation['account']['login'], (int)$installation['id']);
-            }
+        if ($this->getStatusCode($response) === 404) {
+            throw new RepositoryNotFoundException($owner, $name);
         }
+        $data = $this->decodeJson($response);
 
-        throw new TenantNotFoundException($account);
+        return new Repository($owner, $name, (int)$data['id']);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function createDeployment(Tenant $tenant, Deployment $deployment): void
+    public function createDeployment(Repository $repository, Deployment $deployment): void
     {
-        $url = sprintf('%s/repos/%s/%s/deployments', self::API_URL, $tenant->getAccount(), $deployment->getService());
+        $url = sprintf('%s/repos/%s/deployments', self::API_URL, $repository->getFullName());
         $body = [
             'ref' => $deployment->getRef(),
             'environment' => $deployment->getEnvironment()->getName(),
@@ -90,40 +86,33 @@ final class RestClient implements Client
         ];
         $response = $this->httpClient->request('POST', $url, [
             'headers' => [
-                'Authorization' => $this->getInstallAuthorizationHeader($tenant),
+                'Authorization' => $this->getInstallAuthorizationHeader($repository),
                 'Accept' => self::ANT_MAN_MEDIA_TYPE,
             ],
             'json' => $body,
         ]);
-        if ($this->getStatusCode($response) === 404) {
-            throw new ServiceNotFoundException($tenant, $deployment->getService());
-        }
         $this->checkStatusCode($response);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function listDeployments(Tenant $tenant, string $service): array
+    public function listDeployments(Repository $repository): array
     {
-        $url = sprintf('%s/repos/%s/%s/deployments', self::API_URL, $tenant->getAccount(), $service);
+        $url = sprintf('%s/repos/%s/deployments', self::API_URL, $repository->getFullName());
         $response = $this->httpClient->request('GET', $url, [
             'headers' => [
-                'Authorization' => $this->getInstallAuthorizationHeader($tenant),
+                'Authorization' => $this->getInstallAuthorizationHeader($repository),
                 'Accept' => self::ANT_MAN_MEDIA_TYPE,
             ],
         ]);
-        if ($this->getStatusCode($response) === 404) {
-            throw new ServiceNotFoundException($tenant, $service);
-        }
-        $this->checkStatusCode($response);
-        $data = $this->decodeJson($response);
 
+        $data = $this->decodeJson($response);
         $deployments = [];
         foreach ($data as $obj) {
             $environment = new Environment($obj['environment'], (bool)$obj['production_environment'], (bool)$obj['transient_environment']);
             $createdAt = \DateTimeImmutable::createFromFormat('Y-m-d\TH:i:s+', $obj['created_at']);
-            $deployments[] = new Deployment($service, $obj['ref'], $environment, [], $createdAt);
+            $deployments[] = new Deployment($obj['ref'], $environment, [], $createdAt);
         }
 
         return $deployments;
@@ -132,33 +121,32 @@ final class RestClient implements Client
     /**
      * {@inheritDoc}
      */
-    public function readFile(Tenant $tenant, string $service, string $path): string
+    public function readFile(Repository $repository, string $path): string
     {
-        $url = sprintf('%s/repos/%s/%s/contents/%s', self::API_URL, $tenant->getAccount(), $service, $path);
+        $url = sprintf('%s/repos/%s/contents/%s', self::API_URL, $repository->getFullName(), $path);
         $response = $this->httpClient->request('GET', $url, [
             'headers' => [
-                'Authorization' => $this->getInstallAuthorizationHeader($tenant),
+                'Authorization' => $this->getInstallAuthorizationHeader($repository),
                 'Accept' => self::DEFAULT_MEDIA_TYPE,
             ],
         ]);
         if ($this->getStatusCode($response) === 404) {
-            throw new FileNotFoundException($tenant, $service, $path);
+            throw new FileNotFoundException($repository, $path);
         }
-        $this->checkStatusCode($response);
 
-        $json = $this->decodeJson($response);
-        if (!isset($json['type']) || $json['type'] !== 'file') {
+        $data = $this->decodeJson($response);
+        if (!isset($data['type']) || $data['type'] !== 'file') {
             // There is something at this path but not a file. We do not even follow symlinks.
             // Directories return an array (and not an object), so do not have any 'type' property.
-            throw new FileNotFoundException($tenant, $service, $path);
+            throw new FileNotFoundException($repository, $path);
         }
-        if ($json['encoding'] !== 'base64') {
+        if ($data['encoding'] !== 'base64') {
             // We only support base64 decoding, but since this field is explicitly specified,
             // maybe other encodings can be used.
-            throw new RestClientException('Unexpected file encoding from GitHub API: ' . $json['encoding']);
+            throw new RestClientException('Unexpected file encoding from GitHub API: ' . $data['encoding']);
         }
 
-        return base64_decode($json['content']);
+        return base64_decode($data['content']);
     }
 
     private function getAppAuthorizationHeader(): string
@@ -180,35 +168,34 @@ final class RestClient implements Client
         return JWT::encode($payload, $this->privateKey, 'RS256');
     }
 
-    private function getInstallAuthorizationHeader(Tenant $tenant): string
+    private function getInstallAuthorizationHeader(Repository $repository): string
     {
-        return 'token ' . $this->getInstallAccessToken($tenant);
+        return 'token ' . $this->getInstallAccessToken($repository);
     }
 
-    private function getInstallAccessToken(Tenant $tenant): string
+    private function getInstallAccessToken(Repository $repository): string
     {
         // Installation access tokens are valid for about an hour, so we avoid recreating one
         // every time but instead reuse them.
-        $cacheKey = sprintf('github.%s.token', $tenant->getInstallationId());
+        $cacheKey = sprintf('github.%s.token', $repository->getInstallationId());
 
-        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($tenant) {
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($repository) {
             // https://developer.github.com/v3/apps/#create-a-new-installation-token
-            $url = sprintf('%s/app/installations/%s/access_tokens', self::API_URL, $tenant->getInstallationId());
+            $url = sprintf('%s/app/installations/%s/access_tokens', self::API_URL, $repository->getInstallationId());
             $response = $this->httpClient->request('POST', $url, [
                 'headers' => [
                     'Authorization' => $this->getAppAuthorizationHeader(),
                     'Accept' => self::MACHINE_MAN_MEDIA_TYPE,
                 ],
             ]);
-            $this->checkStatusCode($response);
-            $json = $this->decodeJson($response);
+            $data = $this->decodeJson($response);
 
             // Set item's expiration time according to JWT token expiration time. We subtract 1 minute
             // to be on the safe side.
-            $expiresAt = \DateTime::createFromFormat('Y-m-d\TH:i:s\Z', $json['expires_at']);
+            $expiresAt = \DateTime::createFromFormat('Y-m-d\TH:i:s\Z', $data['expires_at']);
             $item->expiresAt($expiresAt->sub(new \DateInterval('PT60S')));
 
-            return $json['token'];
+            return $data['token'];
         });
     }
 
@@ -231,6 +218,7 @@ final class RestClient implements Client
 
     private function decodeJson(ResponseInterface $response): array
     {
+        $this->checkStatusCode($response);
         try {
             return $response->toArray(false);
         } catch (ExceptionInterface $e) {

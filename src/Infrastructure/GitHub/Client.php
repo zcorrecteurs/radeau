@@ -3,7 +3,7 @@
 namespace App\Infrastructure\GitHub;
 
 use App\Domain\Deployment;
-use App\Domain\Tenant;
+use App\Domain\Repository;
 
 /**
  * A client to interact with GitHub.
@@ -11,40 +11,39 @@ use App\Domain\Tenant;
 interface Client
 {
     /**
-     * Returns the tenant associated with the given account name.
+     * Returns the repository with the given name.
      *
-     * @param string $account Account name. It can be either an organization or a user.
-     * @return Tenant
-     * @throws TenantNotFoundException If there is no account with the specified name for which the app is installed.
+     * @param string $owner Owner account name, who can be either an organization or a user.
+     * @param string $name Repository name, scoped under the owner.
+     * @return Repository
+     * @throws RepositoryNotFoundException If the app is not installed for the owner, or if the repository does not exist.
      */
-    public function getTenant(string $account): Tenant;
+    public function getRepository(string $owner, string $name): Repository;
 
     /**
      * Creates a new deployment.
      *
-     * @param Tenant $tenant
+     * @param Repository $repository
      * @param Deployment $deployment
-     * @throws ServiceNotFoundException If the given service does not exist.
+     * @throws RepositoryNotFoundException If the given repository does not exist.
      */
-    public function createDeployment(Tenant $tenant, Deployment $deployment): void;
+    public function createDeployment(Repository $repository, Deployment $deployment): void;
 
     /**
-     * @param Tenant $tenant
-     * @param string $service
+     * @param Repository $repository
      * @return Deployment[]
-     * @throws ServiceNotFoundException If the given service does not exist.
+     * @throws RepositoryNotFoundException If the given repository does not exist.
      */
-    public function listDeployments(Tenant $tenant, string $service): array;
+    public function listDeployments(Repository $repository): array;
 
     /**
      * Returns the content of a file inside a repository.
      *
-     * @param Tenant $tenant
-     * @param string $service Service name.
+     * @param Repository $repository
      * @param string $path Path to the file in the service's repository.
      * @return string
-     * @throws ServiceNotFoundException If the given service does not exist.
+     * @throws RepositoryNotFoundException If the given repository does not exist.
      * @throws FileNotFoundException If there is no file at specified path, or if is is not a file.
      */
-    public function readFile(Tenant $tenant, string $service, string $path): string;
+    public function readFile(Repository $repository, string $path): string;
 }

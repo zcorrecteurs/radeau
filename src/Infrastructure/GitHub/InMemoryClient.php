@@ -3,66 +3,66 @@
 namespace App\Infrastructure\GitHub;
 
 use App\Domain\Deployment;
-use App\Domain\Tenant;
+use App\Domain\Repository;
 
 final class InMemoryClient implements Client
 {
-    private $tenant;
+    private $repository;
     private $deployments = [];
 
     /**
      * Constructor.
      *
-     * @param string $account
+     * @param Repository $repository
      */
-    public function __construct(string $account)
+    public function __construct(Repository $repository)
     {
-        $this->tenant = new Tenant($account, 1);
+        $this->repository = $repository;
     }
 
     /**
      * @inheritDoc
      */
-    public function getTenant(string $account): Tenant
+    public function getRepository(string $owner, string $name): Repository
     {
-        if ($account !== $this->tenant->getAccount()) {
-            throw new TenantNotFoundException($account);
+        if ($owner !== $this->repository->getOwner() || $name !== $this->repository->getName()) {
+            throw new RepositoryNotFoundException($owner, $name);
         }
 
-        return $this->tenant;
+        return $this->repository;
     }
 
     /**
      * {@inheritDoc}
      */
-    public function readFile(Tenant $tenant, string $service, string $path): string
+    public function readFile(Repository $repository, string $path): string
     {
-        $this->checkTenant($tenant);
-        throw new FileNotFoundException($tenant, $service, $path);
+        $this->checkRepository($repository);
+        throw new FileNotFoundException($repository, $path);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function createDeployment(Tenant $tenant, Deployment $deployment): void
+    public function createDeployment(Repository $repository, Deployment $deployment): void
     {
-        $this->checkTenant($tenant);
+        $this->checkRepository($repository);
         $this->deployments[] = $deployment;
     }
 
     /**
      * {@inheritDoc}
      */
-    public function listDeployments(Tenant $tenant, string $service): array
+    public function listDeployments(Repository $repository): array
     {
-        $this->checkTenant($tenant);
+        $this->checkRepository($repository);
         return $this->deployments;
     }
 
-    private function checkTenant(Tenant $tenant): void
+    private function checkRepository(Repository $repository): void
     {
-        if ($tenant != $this->tenant) {
-            throw new \InvalidArgumentException('Wrong tenant: ' . $tenant);
+        if ($repository != $this->repository) {
+            throw new \InvalidArgumentException('Wrong repository: ' . $repository);
         }
     }
 }

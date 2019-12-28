@@ -3,30 +3,31 @@
 namespace App\Tests\Controller;
 
 use App\Controller\DeploymentController;
+use App\Domain\Repository;
 use App\Infrastructure\GitHub\InMemoryClient;
-use PHPUnit\Framework\TestCase;
-use Symfony\Component\HttpFoundation\Request;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
-class DeploymentControllerTest extends TestCase
+class DeploymentControllerTest extends WebTestCase
 {
-    private $client;
+    private $repository;
+    private $github;
     private $controller;
 
     public function setUp()
     {
-        $this->client = new InMemoryClient('zcorrecteurs');
-        $this->controller = new DeploymentController($this->client);
+        $this->repository = new Repository('zcorrecteurs', 'radeau', 1);
+        $this->github = new InMemoryClient($this->repository);
+        $this->controller = new DeploymentController($this->github);
     }
 
-    public function testCreate()
+    public function testCreateDeployment()
     {
-        $request = Request::create('/api/deployment', 'POST', [], [], [], [], '{"ref":"master","service":"foo","environment":"production"}');
+        $client = static::createClient();
+        $client->request('POST', '/api/deployment/radeau', [], [], [], '{"ref":"master","environment":"production"}');
 
-        $response = $this->controller->create($request);
+        $this->assertEquals(200, $client->getResponse()->getStatusCode());
+        $this->assertJsonStringEqualsJsonString('{"ref":"master","environment":"production"}', $client->getResponse()->getContent());
 
-        $this->assertEquals(200, $response->getStatusCode());
-        $this->assertJsonStringEqualsJsonString('{"ref":"master","service":"foo","environment":"production"}', $response->getContent());
-
-        $this->assertEquals(1, count($this->client->listDeployments()));
+        $this->assertEquals(1, count($this->github->listDeployments($this->repository)));
     }
 }

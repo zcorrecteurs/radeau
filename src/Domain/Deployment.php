@@ -6,7 +6,6 @@ namespace App\Domain;
 
 final class Deployment
 {
-    private $service;
     private $ref;
     private $environment;
     private $statuses;
@@ -15,29 +14,21 @@ final class Deployment
     /**
      * Constructor.
      *
-     * @param string $service
      * @param string $ref
      * @param Environment $environment
      * @param DeploymentStatus[] $statuses
      * @param \DateTimeImmutable $createdAt
      */
     public function __construct(
-        string $service,
         string $ref,
         Environment $environment,
         array $statuses = [],
         \DateTimeImmutable $createdAt = null)
     {
-        $this->service = $service;
         $this->ref = $ref;
         $this->environment = $environment;
         $this->statuses = $statuses;
         $this->createdAt = $createdAt ?: new \DateTimeImmutable();
-    }
-
-    public function getService(): string
-    {
-        return $this->service;
     }
 
     /**

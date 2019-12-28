@@ -2,12 +2,12 @@
 
 namespace App\Infrastructure\GitHub;
 
-use App\Domain\Tenant;
+use App\Domain\Repository;
 
 final class FileNotFoundException extends \Exception
 {
-    public function __construct(Tenant $tenant, string $service, string $path)
+    public function __construct(Repository $repository, string $path)
     {
-        parent::__construct(sprintf('File "%s" does not exist for service "%s/%s"', $path, $tenant->getAccount(), $service));
+        parent::__construct(sprintf('File "%s" does not exist in repository "%s"', $path, $repository));
     }
 }

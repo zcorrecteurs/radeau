@@ -13,14 +13,14 @@ final class JsonSerializer
             throw new \InvalidArgumentException('Invalid JSON: ' . json_last_error_msg());
         }
 
-        $missingKeys = array_diff(['environment', 'service', 'ref'], array_keys($data));
+        $missingKeys = array_diff(['environment', 'ref'], array_keys($data));
         if ($missingKeys) {
             throw new \InvalidArgumentException('Missing keys: ' . implode(', ', $missingKeys));
         }
 
         $environment = Environment::fromName($data['environment']);
 
-        return new Deployment($data['service'], $data['ref'], $environment);
+        return new Deployment($data['ref'], $environment);
     }
 
     public static function encodeDeployment(Deployment $deployment): string
@@ -37,7 +37,6 @@ final class JsonSerializer
     {
         return [
             'ref' => $deployment->getRef(),
-            'service' => $deployment->getService(),
             'environment' => $deployment->getEnvironment()->getName(),
         ];
     }
