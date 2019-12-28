@@ -33,7 +33,7 @@ final class Environment
             case 'qa':
                 return new Environment('qa', false, true);
             default:
-                return null;
+                throw new \InvalidArgumentException('Unknown environment: ' . $name);
         }
     }
 

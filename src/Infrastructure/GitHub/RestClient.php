@@ -94,6 +94,9 @@ final class RestClient implements Client
             ],
             'json' => $body,
         ]);
+        if ($this->getStatusCode($response) === 404) {
+            throw new ServiceNotFoundException($tenant, $deployment->getService());
+        }
         $this->checkStatusCode($response);
     }
 

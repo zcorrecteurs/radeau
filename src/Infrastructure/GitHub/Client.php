@@ -26,6 +26,7 @@ interface Client
      * @param string $service Service name.
      * @param string $path Path to the file in the service's repository.
      * @return string
+     * @throws ServiceNotFoundException If the given service does not exist.
      * @throws FileNotFoundException If there is no file at specified path, or if is is not a file.
      */
     public function readFile(Tenant $tenant, string $service, string $path): string;
@@ -35,6 +36,7 @@ interface Client
      *
      * @param Tenant $tenant
      * @param Deployment $deployment
+     * @throws ServiceNotFoundException If the given service does not exist.
      */
     public function createDeployment(Tenant $tenant, Deployment $deployment): void;
 }
