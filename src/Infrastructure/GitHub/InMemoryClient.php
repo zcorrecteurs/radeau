@@ -13,11 +13,12 @@ final class InMemoryClient implements Client
     /**
      * Constructor.
      *
-     * @param Repository $repository
+     * @param string $owner
+     * @param string $name
      */
-    public function __construct(Repository $repository)
+    public function __construct(string $owner, string $name)
     {
-        $this->repository = $repository;
+        $this->repository = new Repository($owner, $name, 1);
     }
 
     /**
@@ -25,7 +26,10 @@ final class InMemoryClient implements Client
      */
     public function getRepository(string $owner, string $name): Repository
     {
-        if ($owner !== $this->repository->getOwner() || $name !== $this->repository->getName()) {
+        // In this implementation (and only this one), we allow passing empty parameters
+        // to allow retrieving the single repository this client is about.
+        if (($owner && $owner !== $this->repository->getOwner())
+            || ($name && $name !== $this->repository->getName())) {
             throw new RepositoryNotFoundException($owner, $name);
         }
 
@@ -53,10 +57,11 @@ final class InMemoryClient implements Client
     /**
      * {@inheritDoc}
      */
-    public function listDeployments(Repository $repository): array
+    public function listDeployments(Repository $repository, int $limit = self::DEFAULT_LIMIT): array
     {
         $this->checkRepository($repository);
-        return $this->deployments;
+
+        return array_slice(array_reverse($this->deployments), 0, $limit);
     }
 
     private function checkRepository(Repository $repository): void

@@ -38,6 +38,7 @@ final class JsonSerializer
         return [
             'ref' => $deployment->getRef(),
             'environment' => $deployment->getEnvironment()->getName(),
+            'createdAt' => $deployment->getCreatedAt()->format('c'),
         ];
     }
 

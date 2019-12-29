@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain;
 
+use App\Infrastructure\Clock\Clock;
+
 final class Deployment
 {
     private $ref;
@@ -28,7 +30,7 @@ final class Deployment
         $this->ref = $ref;
         $this->environment = $environment;
         $this->statuses = $statuses;
-        $this->createdAt = $createdAt ?: new \DateTimeImmutable();
+        $this->createdAt = $createdAt ?: Clock::now();
     }
 
     /**

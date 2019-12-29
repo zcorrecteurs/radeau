@@ -97,23 +97,33 @@ final class RestClient implements Client
     /**
      * {@inheritDoc}
      */
-    public function listDeployments(Repository $repository): array
+    public function listDeployments(Repository $repository, int $limit = self::DEFAULT_LIMIT): array
     {
         $url = sprintf('%s/repos/%s/deployments', self::API_URL, $repository->getFullName());
-        $response = $this->httpClient->request('GET', $url, [
-            'headers' => [
-                'Authorization' => $this->getInstallAuthorizationHeader($repository),
-                'Accept' => self::ANT_MAN_MEDIA_TYPE,
-            ],
-        ]);
-
-        $data = $this->decodeJson($response);
         $deployments = [];
-        foreach ($data as $obj) {
-            $environment = new Environment($obj['environment'], (bool)$obj['production_environment'], (bool)$obj['transient_environment']);
-            $createdAt = \DateTimeImmutable::createFromFormat('Y-m-d\TH:i:s+', $obj['created_at']);
-            $deployments[] = new Deployment($obj['ref'], $environment, [], $createdAt);
-        }
+        do {
+            $response = $this->httpClient->request('GET', $url, [
+                'headers' => [
+                    'Authorization' => $this->getInstallAuthorizationHeader($repository),
+                    'Accept' => self::ANT_MAN_MEDIA_TYPE,
+                ],
+                'query' => ['per_page' => $limit],
+            ]);
+
+            $data = $this->decodeJson($response);
+            foreach ($data as $obj) {
+                $environment = new Environment($obj['environment'], (bool)$obj['production_environment'], (bool)$obj['transient_environment']);
+                $createdAt = \DateTimeImmutable::createFromFormat('Y-m-d\TH:i:s+', $obj['created_at']);
+                $deployments[] = new Deployment($obj['ref'], $environment, [], $createdAt);
+            }
+
+            $pagination = $this->getPagination($response);
+            if (isset($pagination['next'])) {
+                $url = $pagination['next'];
+            } else {
+                $url = false;
+            }
+        } while ($url && count($deployments) < $limit);
 
         return $deployments;
     }
@@ -225,4 +235,19 @@ final class RestClient implements Client
             throw RestClientException::fromException($e);
         }
     }
+
+    private function getPagination(ResponseInterface $response)
+    {
+        $headers = $response->getHeaders(false);
+        $header = isset($headers['link']) ? array_shift($headers['link']) : '';
+        $pagination = [];
+        foreach (explode(',', $header) as $link) {
+            preg_match('/<(.*)>; rel="(.*)"/i', trim($link, ','), $match);
+            if (3 === count($match)) {
+                $pagination[$match[2]] = $match[1];
+            }
+        }
+        return $pagination;
+    }
+
 }

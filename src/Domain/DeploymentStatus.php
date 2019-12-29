@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain;
 
+use App\Infrastructure\Clock\Clock;
+
 final class DeploymentStatus
 {
     private $state;
@@ -24,7 +26,7 @@ final class DeploymentStatus
         $this->state = $state;
         $this->environmentUrl = $environmentUrl;
         $this->logUrl = $logUrl;
-        $this->createdAt = $createdAt ?: new \DateTimeImmutable();
+        $this->createdAt = $createdAt ?: Clock::now();
     }
 
     /**

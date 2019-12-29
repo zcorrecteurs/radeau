@@ -10,6 +10,8 @@ use App\Domain\Repository;
  */
 interface Client
 {
+    const DEFAULT_LIMIT = 15;
+
     /**
      * Returns the repository with the given name.
      *
@@ -31,10 +33,11 @@ interface Client
 
     /**
      * @param Repository $repository
+     * @param int $limit
      * @return Deployment[]
      * @throws RepositoryNotFoundException If the given repository does not exist.
      */
-    public function listDeployments(Repository $repository): array;
+    public function listDeployments(Repository $repository, int $limit = self::DEFAULT_LIMIT): array;
 
     /**
      * Returns the content of a file inside a repository.
