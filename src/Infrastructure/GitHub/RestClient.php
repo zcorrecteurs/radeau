@@ -3,8 +3,10 @@
 namespace App\Infrastructure\GitHub;
 
 use App\Domain\Deployment;
+use App\Domain\DeploymentList;
 use App\Domain\Environment;
 use App\Domain\Repository;
+use App\Domain\RepositoryNotFoundException;
 use Firebase\JWT\JWT;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -91,41 +93,36 @@ final class RestClient implements Client
             ],
             'json' => $body,
         ]);
+        if ($this->getStatusCode($response) === 404) {
+            // This shouldn't happen, as we expect the repository to be valid, but by contract
+            // we must ignore the error.
+            return;
+        }
         $this->checkStatusCode($response);
     }
 
     /**
      * {@inheritDoc}
      */
-    public function listDeployments(Repository $repository, int $limit = self::DEFAULT_LIMIT): array
+    public function listDeployments(Repository $repository, int $limit): DeploymentList
     {
         $url = sprintf('%s/repos/%s/deployments', self::API_URL, $repository->getFullName());
+        $data = $this->paginate('GET', $url, [
+            'headers' => [
+                'Authorization' => $this->getInstallAuthorizationHeader($repository),
+                'Accept' => self::ANT_MAN_MEDIA_TYPE,
+            ],
+            'query' => ['per_page' => $limit],
+        ]);
+
         $deployments = [];
-        do {
-            $response = $this->httpClient->request('GET', $url, [
-                'headers' => [
-                    'Authorization' => $this->getInstallAuthorizationHeader($repository),
-                    'Accept' => self::ANT_MAN_MEDIA_TYPE,
-                ],
-                'query' => ['per_page' => $limit],
-            ]);
+        foreach ($data as $obj) {
+            $environment = new Environment($obj['environment'], (bool)$obj['production_environment'], (bool)$obj['transient_environment']);
+            $createdAt = \DateTimeImmutable::createFromFormat('Y-m-d\TH:i:s+', $obj['created_at']);
+            $deployments[] = new Deployment($obj['ref'], $environment, [], $createdAt);
+        }
 
-            $data = $this->decodeJson($response);
-            foreach ($data as $obj) {
-                $environment = new Environment($obj['environment'], (bool)$obj['production_environment'], (bool)$obj['transient_environment']);
-                $createdAt = \DateTimeImmutable::createFromFormat('Y-m-d\TH:i:s+', $obj['created_at']);
-                $deployments[] = new Deployment($obj['ref'], $environment, [], $createdAt);
-            }
-
-            $pagination = $this->getPagination($response);
-            if (isset($pagination['next'])) {
-                $url = $pagination['next'];
-            } else {
-                $url = false;
-            }
-        } while ($url && count($deployments) < $limit);
-
-        return $deployments;
+        return new DeploymentList($deployments);
     }
 
     /**
@@ -236,6 +233,29 @@ final class RestClient implements Client
         }
     }
 
+    private function paginate(string $method, string $firstUrl, array $options, int $limit = -1)
+    {
+        $items = [];
+        $url = $firstUrl;
+        do {
+            $response = $this->httpClient->request($method, $url, $options);
+            if ($this->getStatusCode($response) === 404) {
+                // This shouldn't happen, as we expect the repository to be valid, but by contract
+                // we must ignore the error.
+                return $items;
+            }
+            $items = array_merge($items, $this->decodeJson($response));
+            $pagination = $this->getPagination($response);
+            $hasNext = isset($pagination['next']);
+            if ($hasNext) {
+                $url = $pagination['next'];
+            }
+            $maybeMore = $limit === -1 || count($items) < $limit;
+        } while ($hasNext && $maybeMore);
+
+        return $items;
+    }
+
     private function getPagination(ResponseInterface $response)
     {
         $headers = $response->getHeaders(false);
@@ -247,6 +267,7 @@ final class RestClient implements Client
                 $pagination[$match[2]] = $match[1];
             }
         }
+
         return $pagination;
     }
 

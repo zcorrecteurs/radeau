@@ -37,7 +37,7 @@ class RestClientTest extends TestCase
     }
 
     /**
-     * @expectedException \App\Infrastructure\GitHub\RepositoryNotFoundException
+     * @expectedException \App\Domain\RepositoryNotFoundException
      */
     public function testGetRepositoryWhenOwnerDoesNotExist()
     {
@@ -45,7 +45,7 @@ class RestClientTest extends TestCase
     }
 
     /**
-     * @expectedException \App\Infrastructure\GitHub\RepositoryNotFoundException
+     * @expectedException \App\Domain\RepositoryNotFoundException
      */
     public function testGetRepositoryWhenRepositoryDoesNotExist()
     {

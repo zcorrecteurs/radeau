@@ -35,7 +35,7 @@ final class Environment
             case 'qa':
                 return new Environment('qa', false, true);
             default:
-                throw new \InvalidArgumentException('Unknown environment: ' . $name);
+                throw new \InvalidArgumentException(sprintf('Unknown environment "%s"', $name));
         }
     }
 

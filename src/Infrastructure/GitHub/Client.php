@@ -3,15 +3,15 @@
 namespace App\Infrastructure\GitHub;
 
 use App\Domain\Deployment;
+use App\Domain\DeploymentList;
 use App\Domain\Repository;
+use App\Domain\RepositoryNotFoundException;
 
 /**
  * A client to interact with GitHub.
  */
 interface Client
 {
-    const DEFAULT_LIMIT = 15;
-
     /**
      * Returns the repository with the given name.
      *
@@ -27,17 +27,15 @@ interface Client
      *
      * @param Repository $repository
      * @param Deployment $deployment
-     * @throws RepositoryNotFoundException If the given repository does not exist.
      */
     public function createDeployment(Repository $repository, Deployment $deployment): void;
 
     /**
      * @param Repository $repository
      * @param int $limit
-     * @return Deployment[]
-     * @throws RepositoryNotFoundException If the given repository does not exist.
+     * @return DeploymentList
      */
-    public function listDeployments(Repository $repository, int $limit = self::DEFAULT_LIMIT): array;
+    public function listDeployments(Repository $repository, int $limit): DeploymentList;
 
     /**
      * Returns the content of a file inside a repository.

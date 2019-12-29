@@ -3,7 +3,9 @@
 namespace App\Infrastructure\GitHub;
 
 use App\Domain\Deployment;
+use App\Domain\DeploymentList;
 use App\Domain\Repository;
+use App\Domain\RepositoryNotFoundException;
 
 final class InMemoryClient implements Client
 {
@@ -41,7 +43,6 @@ final class InMemoryClient implements Client
      */
     public function readFile(Repository $repository, string $path): string
     {
-        $this->checkRepository($repository);
         throw new FileNotFoundException($repository, $path);
     }
 
@@ -50,24 +51,21 @@ final class InMemoryClient implements Client
      */
     public function createDeployment(Repository $repository, Deployment $deployment): void
     {
-        $this->checkRepository($repository);
+        if ($repository != $this->repository) {
+            return;
+        }
         $this->deployments[] = $deployment;
     }
 
     /**
      * {@inheritDoc}
      */
-    public function listDeployments(Repository $repository, int $limit = self::DEFAULT_LIMIT): array
-    {
-        $this->checkRepository($repository);
-
-        return array_slice(array_reverse($this->deployments), 0, $limit);
-    }
-
-    private function checkRepository(Repository $repository): void
+    public function listDeployments(Repository $repository, int $limit): DeploymentList
     {
         if ($repository != $this->repository) {
-            throw new \InvalidArgumentException('Wrong repository: ' . $repository);
+            return DeploymentList::empty();
         }
+
+        return new DeploymentList(array_slice(array_reverse($this->deployments), 0, $limit));
     }
 }

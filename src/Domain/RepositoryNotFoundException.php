@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Infrastructure\GitHub;
+namespace App\Domain;
 
 final class RepositoryNotFoundException extends \Exception
 {

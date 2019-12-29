@@ -2,26 +2,35 @@
 
 namespace App\Controller;
 
-use App\Domain\JsonSerializer;
-use App\Infrastructure\GitHub\Client;
-use App\Infrastructure\GitHub\RepositoryNotFoundException;
+use App\Application\CreateDeployment\CreateDeploymentCommand;
+use App\Application\ListDeployments\ListDeploymentsQuery;
+use App\Domain\RepositoryNotFoundException;
+use App\Infrastructure\Bus\CommandBusInterface;
+use App\Infrastructure\Bus\QueryBusInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Serializer\SerializerInterface;
 
 final class DeploymentController
 {
-    private $github;
+    private $commandBus;
+    private $queryBus;
+    private $serializer;
 
     /**
      * Constructor.
      *
-     * @param Client $github
+     * @param CommandBusInterface $commandBus
+     * @param QueryBusInterface $queryBus
+     * @param SerializerInterface $serializer
      */
-    public function __construct(Client $github)
+    public function __construct(CommandBusInterface $commandBus, QueryBusInterface $queryBus, SerializerInterface $serializer)
     {
-        $this->github = $github;
+        $this->commandBus = $commandBus;
+        $this->queryBus = $queryBus;
+        $this->serializer = $serializer;
     }
 
     /**
@@ -33,24 +42,25 @@ final class DeploymentController
      */
     public function createDeployment(Request $request, string $service): Response
     {
-        try {
-            $tenant = $this->github->getRepository('zcorrecteurs', $service);
-        } catch (RepositoryNotFoundException $e) {
-            return $this->createInvalidArgumentResponse($e->getMessage());
+        $json = json_decode($request->getContent(), true);
+        if (null === $json) {
+            return $this->createInvalidArgumentResponse('Invalid JSON: ' . json_last_error_msg());
         }
+
+        $command = new CreateDeploymentCommand();
+        $command->service = $service;
+        $command->environment = $json['environment'] ?? null;
+        $command->ref = $json['ref'] ?? null;
+
         try {
-            $deployment = JsonSerializer::decodeDeployment($request->getContent());
+            $this->commandBus->handle($command);
+        } catch (RepositoryNotFoundException $e) {
+            return $this->createNotFoundResponse($e->getMessage());
         } catch (\InvalidArgumentException $e) {
             return $this->createInvalidArgumentResponse($e->getMessage());
         }
 
-        try {
-            $this->github->createDeployment($tenant, $deployment);
-        } catch (RepositoryNotFoundException $e) {
-            return $this->createInvalidArgumentResponse($e->getMessage());
-        }
-
-        return $this->createJsonResponse(JsonSerializer::encodeDeployment($deployment));
+        return Response::create('', 202);
     }
 
     /**
@@ -62,18 +72,17 @@ final class DeploymentController
      */
     public function listDeployments(Request $request, string $service): Response
     {
+        $query = new ListDeploymentsQuery();
+        $query->service = $service;
+
         try {
-            $repository = $this->github->getRepository('zcorrecteurs', $service);
-        } catch (RepositoryNotFoundException $e) {
-            return $this->createInvalidArgumentResponse($e->getMessage());
-        }
-        try {
-            $deployments = $this->github->listDeployments($repository);
+            $result = $this->queryBus->handle($query);
         } catch (RepositoryNotFoundException $e) {
             return $this->createNotFoundResponse($e->getMessage());
         }
+        $json = $this->serializer->serialize($result, 'json');
 
-        return $this->createJsonResponse( JsonSerializer::encodeDeployments($deployments));
+        return $this->createJsonResponse($json);
     }
 
     private function createInvalidArgumentResponse(string $message): Response
