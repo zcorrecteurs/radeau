@@ -30,4 +30,9 @@ final class DeploymentList
     {
         return $this->deployments;
     }
+
+    public function size(): int
+    {
+        return count($this->deployments);
+    }
 }

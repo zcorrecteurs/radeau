@@ -9,18 +9,17 @@ use App\Domain\RepositoryNotFoundException;
 
 final class InMemoryClient implements Client
 {
-    private $repository;
+    private $owner;
     private $deployments = [];
 
     /**
      * Constructor.
      *
      * @param string $owner
-     * @param string $name
      */
-    public function __construct(string $owner, string $name)
+    public function __construct(string $owner)
     {
-        $this->repository = new Repository($owner, $name, 1);
+        $this->owner = $owner;
     }
 
     /**
@@ -28,14 +27,12 @@ final class InMemoryClient implements Client
      */
     public function getRepository(string $owner, string $name): Repository
     {
-        // In this implementation (and only this one), we allow passing empty parameters
-        // to allow retrieving the single repository this client is about.
-        if (($owner && $owner !== $this->repository->getOwner())
-            || ($name && $name !== $this->repository->getName())) {
+        if ($owner !== $this->owner) {
             throw new RepositoryNotFoundException($owner, $name);
         }
 
-        return $this->repository;
+        // Otherwise, we consider any repository to exist.
+        return new Repository($owner, $name, 1);
     }
 
     /**
@@ -51,10 +48,13 @@ final class InMemoryClient implements Client
      */
     public function createDeployment(Repository $repository, Deployment $deployment): void
     {
-        if ($repository != $this->repository) {
+        if ($repository->getOwner() !== $this->owner) {
             return;
         }
-        $this->deployments[] = $deployment;
+        if (!isset($this->deployments[$repository->getName()])) {
+            $this->deployments[$repository->getName()] = [];
+        }
+        array_unshift($this->deployments[$repository->getName()], $deployment);
     }
 
     /**
@@ -62,10 +62,11 @@ final class InMemoryClient implements Client
      */
     public function listDeployments(Repository $repository, int $limit): DeploymentList
     {
-        if ($repository != $this->repository) {
+        if ($repository->getOwner() !== $this->owner) {
             return DeploymentList::empty();
         }
+        $deployments = $this->deployments[$repository->getName()] ?? [];
 
-        return new DeploymentList(array_slice(array_reverse($this->deployments), 0, $limit));
+        return new DeploymentList(array_slice($deployments, 0, $limit));
     }
 }

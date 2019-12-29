@@ -1,4 +1,4 @@
 services:
     App\Infrastructure\GitHub\Client:
         class: App\Infrastructure\GitHub\InMemoryClient
-        arguments: ['zcorrecteurs', 'radeau']
+        arguments: ['zcorrecteurs']
