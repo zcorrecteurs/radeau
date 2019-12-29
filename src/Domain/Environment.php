@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain;
 
+use Assert\Assertion;
+use Assert\AssertionFailedException;
+
 final class Environment
 {
     private $name;
@@ -24,19 +27,21 @@ final class Environment
         $this->transient = $transient;
     }
 
+    /**
+     * @param string $name
+     * @return Environment
+     * @throws AssertionFailedException
+     */
     public static function fromName(string $name): Environment
     {
-        switch ($name) {
-            case 'prod':
-            case 'production':
-                return new Environment('production', true, false);
-            case 'staging':
-                return new Environment('staging', false, false);
-            case 'qa':
-                return new Environment('qa', false, true);
-            default:
-                throw new \InvalidArgumentException(sprintf('Unknown environment "%s"', $name));
-        }
+        $environments = [
+            'production' => new Environment('production', true, false),
+            'staging' => new Environment('staging', false, false),
+            'qa' => new Environment('qa', false, true),
+        ];
+        Assertion::choice($name, array_keys($environments), null, 'environment');
+
+        return $environments[$name];
     }
 
     /**

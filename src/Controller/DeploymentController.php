@@ -7,6 +7,7 @@ use App\Application\ListDeployments\ListDeploymentsQuery;
 use App\Domain\RepositoryNotFoundException;
 use App\Infrastructure\Bus\CommandBusInterface;
 use App\Infrastructure\Bus\QueryBusInterface;
+use Assert\AssertionFailedException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -47,10 +48,11 @@ final class DeploymentController
             return $this->createInvalidArgumentResponse('Invalid JSON: ' . json_last_error_msg());
         }
 
-        $command = new CreateDeploymentCommand();
-        $command->service = $service;
-        $command->environment = $json['environment'] ?? null;
-        $command->ref = $json['ref'] ?? null;
+        try {
+            $command = new CreateDeploymentCommand('zcorrecteurs', $service, $json['ref'] ?? '', $json['environment'] ?? '');
+        } catch (AssertionFailedException $e) {
+            return $this->createInvalidArgumentResponse($e->getMessage());
+        }
 
         try {
             $this->commandBus->handle($command);

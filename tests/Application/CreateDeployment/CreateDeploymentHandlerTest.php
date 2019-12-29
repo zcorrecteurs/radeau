@@ -23,11 +23,7 @@ class CreateDeploymentHandlerTest extends TestCase
 
     public function testHandle()
     {
-        $command = new CreateDeploymentCommand();
-        $command->ref = 'master';
-        $command->service = 'test';
-        $command->environment = 'staging';
-
+        $command = new CreateDeploymentCommand(self::OWNER, 'test', 'master', 'staging');
         $this->handler->handle($command);
 
         $deployments = $this->github->listDeployments(new Repository(self::OWNER, 'test', 1), 100);

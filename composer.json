@@ -7,6 +7,7 @@
         "ext-ctype": "*",
         "ext-iconv": "*",
         "ext-json": "*",
+        "beberlei/assert": "^3.2",
         "firebase/php-jwt": "^5.0",
         "nyholm/psr7": "^1.2",
         "sensio/framework-extra-bundle": "^5.5",
